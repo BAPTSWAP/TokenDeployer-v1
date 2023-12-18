@@ -44,7 +44,7 @@ module bapt_framework::deployer {
             ERROR_INVALID_BAPT_ACCOUNT
         );
         // only allowed after the deployer is initialized
-        assert!(exists<Config>(@bapt_framework), ERROR_INVALID_BAPT_ACCOUNT);
+        assert!(exists<Config>(@bapt_framework), ERROR_ERROR_INSUFFICIENT_APT_BALANCE);
 
         let config = borrow_global_mut<Config>(@bapt_framework);
         config.fee = new_fee;
@@ -56,7 +56,7 @@ module bapt_framework::deployer {
             ERROR_INVALID_BAPT_ACCOUNT
         );
         // only allowed after the deployer is initialized
-        assert!(exists<Config>(@bapt_framework), ERROR_INVALID_BAPT_ACCOUNT);
+        assert!(exists<Config>(@bapt_framework), ERROR_ERROR_INSUFFICIENT_APT_BALANCE);
 
         let config = borrow_global_mut<Config>(@bapt_framework);
         config.owner = new_owner;
