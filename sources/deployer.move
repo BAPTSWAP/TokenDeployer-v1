@@ -21,8 +21,6 @@ module bapt_framework::deployer {
     use std::signer;
     use std::string::{String};
 
-    // TODO: add friend modules: swap_v2: so coin owners can toggle fees in pools
-
     struct Config has key {
         owner: address,
         fee: u64
@@ -32,6 +30,7 @@ module bapt_framework::deployer {
     const ERROR_INVALID_BAPT_ACCOUNT: u64 = 0;
     const ERROR_ERROR_INSUFFICIENT_APT_BALANCE: u64 = 1;
     const INSUFFICIENT_APT_BALANCE: u64 = 2;
+    const: ERROR_NOT_INITIALIZED: u64 = 3;
 
 
     entry public fun init(bapt_framework: &signer, fee: u64, owner: address){
@@ -101,7 +100,7 @@ module bapt_framework::deployer {
         coin::destroy_freeze_cap<CoinType>(freeze_cap);
         coin::destroy_burn_cap<CoinType>(burn_cap);
 
-        assert!(coin::is_coin_initialized<CoinType>(), 1);
+        assert!(coin::is_coin_initialized<CoinType>(), ERROR_NOT_INITIALIZED);
     }
 
     // checks if a given owner address + coin_type exists in coin_table; callable only by anyone
