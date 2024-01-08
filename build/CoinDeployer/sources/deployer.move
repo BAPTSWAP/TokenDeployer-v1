@@ -10,13 +10,9 @@
 
 module bapt_framework::deployer {
 
-    use aptos_framework::coin::{
-        Self, 
-        BurnCapability, 
-        FreezeCapability, 
-        MintCapability
-    };
+    use aptos_framework::coin;
     use aptos_framework::aptos_coin::AptosCoin;
+    use aptos_framework::event;
     use aptos_std::type_info;
     use std::signer;
     use std::string::{String};
@@ -24,6 +20,18 @@ module bapt_framework::deployer {
     struct Config has key {
         owner: address,
         fee: u64
+    }
+
+    #[event]
+    struct NewFeeEvent has drop, store { new_fee: u64 }
+    fun emit_new_fee_event(new_fee: u64) {
+        event::emit<NewFeeEvent>(NewFeeEvent { new_fee })
+    }
+
+    #[event]
+    struct NewOwnerEvent has drop, store { new_owner: address }
+    fun emit_new_owner_event(new_owner: address) {
+        event::emit<NewOwnerEvent>(NewOwnerEvent { new_owner })
     }
 
     // Error Codes 
@@ -44,10 +52,11 @@ module bapt_framework::deployer {
             ERROR_INVALID_BAPT_ACCOUNT
         );
         // only allowed after the deployer is initialized
-        assert!(exists<Config>(@bapt_framework), ERROR_ERROR_INSUFFICIENT_APT_BALANCE);
+        assert!(exists<Config>(@bapt_framework), ERROR_INVALID_BAPT_ACCOUNT);
 
         let config = borrow_global_mut<Config>(@bapt_framework);
         config.fee = new_fee;
+        emit_new_fee_event(new_fee);
     }
 
     entry public fun update_owner(bapt_framework: &signer, new_owner: address) acquires Config {
@@ -56,10 +65,11 @@ module bapt_framework::deployer {
             ERROR_INVALID_BAPT_ACCOUNT
         );
         // only allowed after the deployer is initialized
-        assert!(exists<Config>(@bapt_framework), ERROR_ERROR_INSUFFICIENT_APT_BALANCE);
+        assert!(exists<Config>(@bapt_framework), ERROR_INVALID_BAPT_ACCOUNT);
 
         let config = borrow_global_mut<Config>(@bapt_framework);
         config.owner = new_owner;
+        emit_new_owner_event(new_owner);
     }
 
     // Generates a new coin and mints the total supply to the deployer. capabilties are then destroyed
@@ -72,7 +82,7 @@ module bapt_framework::deployer {
         monitor_supply: bool,
     ) acquires Config {        
         // only allowed after the deployer is initialized
-        assert!(exists<Config>(@bapt_framework), ERROR_ERROR_INSUFFICIENT_APT_BALANCE);
+        assert!(exists<Config>(@bapt_framework), ERROR_INVALID_BAPT_ACCOUNT);
         // the deployer must have enough APT to pay for the fee
         assert!(
             coin::balance<AptosCoin>(signer::address_of(deployer)) >= borrow_global<Config>(@bapt_framework).fee,
@@ -114,7 +124,7 @@ module bapt_framework::deployer {
     fun mint_internal<CoinType>(
         deployer_addr: address,
         total_supply: u64,
-        mint_cap: MintCapability<CoinType>
+        mint_cap: coin::MintCapability<CoinType>
     ) {
         let coins_minted = coin::mint(total_supply, &mint_cap);
         coin::deposit(deployer_addr, coins_minted);
@@ -163,7 +173,7 @@ module bapt_framework::deployer {
         // aptos_framework::account::create_account_for_test(signer::address_of(user));
         init(&bapt_framework, 1, signer::address_of(&bapt_framework));
         // register aptos coin and mint some APT to be able to pay for the fee of generate_coin
-        managed_coin::register<AptosCoin>(&bapt_framework);
+        coin::register<AptosCoin>(&bapt_framework);
         let (aptos_coin_burn_cap, aptos_coin_mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         // mint some APT to be able to pay for the fee of generate_coin
         aptos_coin::mint(&aptos_framework, signer::address_of(&bapt_framework), 1000);
