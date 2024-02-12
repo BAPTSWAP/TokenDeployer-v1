@@ -4,8 +4,7 @@ version = "1.0.1"
 authors = []
 
 [addresses]
-bapt_framework = "d0ec361a55b327913690b2851cec05f1e017ec6c647689cae051644f667a1ddb"
-
+bapt_framework = "a55a7122aa085e4bf34b755675fb900c40ee92f60c068255609ecea8ef4123f3"
 [dev-addresses]
 
 [dependencies.AptosFramework]

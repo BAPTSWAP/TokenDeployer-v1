@@ -4,8 +4,6 @@ script {
     fun init(bapt_framework: &signer, fee: u64, owner: address) {//change the fee accordingly
         deployer::init(bapt_framework, fee, owner);
     }
-
-    
 }
 
 script {
@@ -20,6 +18,6 @@ script {
     use bapt_framework::deployer;
 
     fun update_owner(bapt_framework: &signer, new_owner: address) {
-        deployer::update_owner(bapt_framework, new_owner);
+        deployer::update_fee_account(bapt_framework, new_owner);
     }
 }
