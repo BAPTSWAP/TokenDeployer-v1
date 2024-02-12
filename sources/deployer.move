@@ -10,10 +10,12 @@
 
 module bapt_framework::deployer {
 
-    use aptos_framework::coin;
+    use aptos_framework::coin::{Self, BurnCapability, FreezeCapability};
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::event;
     use aptos_std::type_info;
+    use std::error;
+    use std::option::{Self, Option};
     use std::signer;
     use std::string::{String};
 
@@ -22,6 +24,11 @@ module bapt_framework::deployer {
         fee: u64
     }
 
+    struct Caps<phantom CoinType> has key {
+        burn_cap: Option<BurnCapability<CoinType>>,
+        freeze_cap: Option<FreezeCapability<CoinType>>
+    }
+    
     #[event]
     struct NewFeeEvent has drop, store { new_fee: u64 }
     fun emit_new_fee_event(new_fee: u64) {
@@ -39,6 +46,7 @@ module bapt_framework::deployer {
     const ERROR_ERROR_INSUFFICIENT_APT_BALANCE: u64 = 1;
     const INSUFFICIENT_APT_BALANCE: u64 = 2;
     const ERROR_NOT_INITIALIZED: u64 = 3;
+    const ERROR_NO_CAPABILITIES: u64 = 4;
 
 
     entry public fun init(bapt_framework: &signer, fee: u64, owner: address){
@@ -66,6 +74,109 @@ module bapt_framework::deployer {
         let config = borrow_global_mut<Config>(@bapt_framework);
         config.owner = new_fee_account;
         emit_new_owner_event(new_fee_account);
+    }
+
+    // Generate a coin with options to choose if the coin should be burnable, freezable, or both.
+    entry public fun generate_coin_with_caps<CoinType>(
+        deployer: &signer,
+        name: String,
+        symbol: String,
+        decimals: u8,
+        total_supply: u64,
+        monitor_supply: bool,
+        is_burnable: bool,
+        is_freezable: bool
+    ) acquires Config {
+        // only allowed after the deployer is initialized
+        assert!(exists<Config>(@bapt_framework), ERROR_INVALID_BAPT_ACCOUNT);
+        // the deployer must have enough APT to pay for the fee
+        assert!(
+            coin::balance<AptosCoin>(signer::address_of(deployer)) >= borrow_global<Config>(@bapt_framework).fee,
+            INSUFFICIENT_APT_BALANCE
+        );
+        let deployer_addr = signer::address_of(deployer);
+        let (
+            burn_cap, 
+            freeze_cap, 
+            mint_cap
+        ) = coin::initialize<CoinType>(
+            deployer, 
+            name, 
+            symbol, 
+            decimals, 
+            monitor_supply
+        );
+
+        coin::register<CoinType>(deployer);
+        mint_internal<CoinType>(deployer_addr, total_supply, mint_cap);
+
+        let option_burn_cap = if (is_burnable) {
+            option::some(burn_cap) } else {
+                coin::destroy_burn_cap<CoinType>(burn_cap);
+                option::none() 
+            };
+        let option_freeze_cap = if (is_freezable) {
+            option::some(freeze_cap) } else { 
+                coin::destroy_freeze_cap<CoinType>(freeze_cap);
+                option::none() 
+            };
+        move_to(
+            deployer, 
+            Caps { 
+                burn_cap: option_burn_cap, 
+                freeze_cap: option_freeze_cap 
+            }
+        );
+        collect_fee(deployer);
+    }
+
+    // Withdraw an `amount` of coin `CoinType` from `account` and burn it.
+    public entry fun burn<CoinType>(
+        account: &signer,
+        amount: u64,
+    ) acquires Caps {
+        let account_addr = signer::address_of(account);
+
+        assert!(
+            exists<Caps<CoinType>>(account_addr),
+            error::not_found(ERROR_NO_CAPABILITIES),
+        );
+        // borrow cap resource and get burn cap option
+        let burn_cap = option::borrow(&borrow_global<Caps<CoinType>>(signer::address_of(account)).burn_cap);
+
+        let to_burn = coin::withdraw<CoinType>(account, amount);
+
+        coin::burn(to_burn, burn_cap);
+    }
+
+    // Freeze a coin store `CoinType` from `account`.
+    public entry fun freeze_coinstore<CoinType>(
+        account: &signer,
+        acc_addr_to_freeze: address
+    ) acquires Caps {
+        let account_addr = signer::address_of(account);
+        assert!(
+            exists<Caps<CoinType>>(account_addr),
+            error::not_found(ERROR_NO_CAPABILITIES),
+        );
+        // borrow cap resource and get freeze cap option
+        let freeze_cap = option::borrow(&borrow_global<Caps<CoinType>>(account_addr).freeze_cap);
+        coin::freeze_coin_store(acc_addr_to_freeze, freeze_cap);
+    }
+
+    // Unfreeze a coin store `CoinType` from `account`.
+    public entry fun unfreeze_coinstore<CoinType>(
+        account: &signer,
+        acc_addr_to_unfreeze: address
+    ) acquires Caps {
+        let account_addr = signer::address_of(account);
+        assert!(
+            exists<Caps<CoinType>>(account_addr),
+            error::not_found(ERROR_NO_CAPABILITIES),
+        );
+        // borrow cap resource and get freeze cap option
+        let freeze_cap = option::borrow(&borrow_global<Caps<CoinType>>(account_addr).freeze_cap);
+        coin::unfreeze_coin_store(acc_addr_to_unfreeze, freeze_cap);
     }
 
     // Generates a new coin and mints the total supply to the deployer. capabilties are then destroyed
