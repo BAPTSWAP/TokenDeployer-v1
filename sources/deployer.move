@@ -41,11 +41,17 @@ module bapt_framework::deployer {
         event::emit<NewOwnerEvent>(NewOwnerEvent { new_owner })
     }
 
-    // Error Codes 
+    /// Error Codes 
+    
+    /// The account passed is not the BAPT account
     const ERROR_INVALID_BAPT_ACCOUNT: u64 = 0;
+    /// The caller does not have enough APT to pay
     const ERROR_ERROR_INSUFFICIENT_APT_BALANCE: u64 = 1;
+    /// The caller does not have enough APT to pay
     const INSUFFICIENT_APT_BALANCE: u64 = 2;
+    /// The coin type is not initialized
     const ERROR_NOT_INITIALIZED: u64 = 3;
+    /// The account does not the required capabilities
     const ERROR_NO_CAPABILITIES: u64 = 4;
 
 
